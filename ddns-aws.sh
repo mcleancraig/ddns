@@ -5,8 +5,9 @@ APIKEY="7a4gElr2E9mIwnMwLbSj"
 ZONE="fukka.co.uk" # Zone according to nsone
 AWSZONE="Z159W85ZCGY57D" # Zone according to AWS
 RECORD="fukka.co.uk" # Record you want to change within the zone
-IP_FINDER_LIST="http://bot.whatismyipaddress.com" "http://ipinfo.io/ip"
-resolver=aws
+IP_FINDER_LIST="http://bot.whatismyipaddress.com http://ipinfo.io/ip"
+resolver="aws"
+debug=true
 
 # To Do:
 # Check current ip is valid, external IP - DONE
@@ -56,13 +57,18 @@ function is_public_ip()
 #Rewrite mode...
 
 # Get my public IP
-for address in ${IP_FINDER_LIST}
+for finder in ${IP_FINDER_LIST}
 do
   debug "checking from ${finder}"
   IPADDR=$(wget -qO- ${finder})
-  debud "returned ${IPADDR}"
-  is_valid_ip ${IPADDR} && is_public_ip ${IPADDR} && break
+  debug "returned ${IPADDR}"
+  if (is_valid_ip ${IPADDR} && is_public_ip ${IPADDR}) 
+  then
+   break
+  fi
 done
+
+debug "IP returned is "${IPADDR}"
 
 # Do the do...
 case resolver in 
@@ -76,11 +82,14 @@ curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
    ]
   }
  ]
-}' https://api.nsone.net/v1/zones/$ZONE/$RECORD/A ;;
+}' https://api.nsone.net/v1/zones/$ZONE/$RECORD/A 
+;;
  "aws")
 # AWS version 
- aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$IPADDR'" } ] } } ] }' ;;
-  *) bail "Invalid resolver specified: ${resolver}" ;;
+ aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$IPADDR'" } ] } } ] }' 
+ ;;
+  *) bail "Invalid resolver specified: ${resolver}" 
+ ;;
 esac
 
  
