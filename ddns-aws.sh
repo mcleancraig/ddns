@@ -72,7 +72,7 @@ debug "IP returned is "${IPADDR}"
 
 # Do the do...
 case $resolver in 
- "nsone")
+ nsone)
 # NSOne version
 curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
  "answers": [
@@ -84,7 +84,7 @@ curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
  ]
 }' https://api.nsone.net/v1/zones/$ZONE/$RECORD/A 
 ;;
- "aws")
+ aws)
 # AWS version 
  aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$IPADDR'" } ] } } ] }' 
  ;;
@@ -92,7 +92,6 @@ curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
  ;;
 esac
 
- 
  
  
  
