@@ -74,5 +74,4 @@ fi
 # ]
 #}' https://api.nsone.net/v1/zones/$ZONE/$RECORD/A
  
- aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", 
-"Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "$ZONE", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "$IPADDR" } ] } } ] }'
+ aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$ZONE'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$IPADDR'" } ] } } ] }'
