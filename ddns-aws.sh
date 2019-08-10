@@ -71,7 +71,7 @@ done
 debug "IP returned is "${IPADDR}"
 
 # Do the do...
-case resolver in 
+case $resolver in 
  "nsone")
 # NSOne version
 curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
