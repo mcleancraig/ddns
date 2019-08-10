@@ -44,6 +44,8 @@ function check_ip()
   fi
 }
 
+# Get my public IP
+
 #IPDATA=`/sbin/ifconfig $IFACE | egrep "^[[:space:]]+inet addr:"`
 #if [ -z $IPDATA ]; then
 #  IPDATA=`/sbin/ifconfig $IFACE | egrep "^[[:space:]]+inet "`
@@ -51,8 +53,10 @@ function check_ip()
 #IPADDR=`echo $IPDATA | awk {'print $2'} | cut -d : -f 2`
 IPADDR=$(wget -qO- http://bot.whatismyipaddress.com)
 
+# Check it's valid
 check_ip $IPADDR
 
+# Check it's not a non-routable IP, if it is, then try getting my public IP from a different source
 public_ip $IPADDR
 if [ $? -eq 2 ]; then
   echo "This should never happen..."
@@ -73,5 +77,6 @@ fi
 #  }
 # ]
 #}' https://api.nsone.net/v1/zones/$ZONE/$RECORD/A
- 
+#
+# Updated to AWS version 
  aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$ZONE'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$IPADDR'" } ] } } ] }'
