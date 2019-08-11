@@ -29,6 +29,7 @@ debug=true && echo "DEBUG: $1"
 
 function is_valid_ip()
 {
+ debug "running is_valid_ip $1"
   local ip=$1
   local stat=1 # set to fail to danger
 
@@ -40,45 +41,61 @@ function is_valid_ip()
     [[ ${ip[0]} -le 255 && ${ip[1]} -le 255 && ${ip[2]} -le 255 && ${ip[3]} -le 255 ]]
       stat=$?
   fi
+ debug "returining $stat from is_valid_ip"
   return $stat
 }
 
 #inspired by https://unix.stackexchange.com/questions/98923/programmatically-extract-private-ip-addresses
 function is_public_ip()
 {
+ debug "running is_public_ip $1"
   local ip=$1
   local stat=2 # should never fail with this code
   
-  echo $ip | grep -q -E '^(192\.168|10\.|172\.1[6789]\.|172\.2[0-9]\.|172\.3[01]\.)'
+  echo $ip | grep -v -q -E '^(192\.168|10\.|172\.1[6789]\.|172\.2[0-9]\.|172\.3[01]\.)'
   stat=$?
+  debug "returning $stat from is_public_ip"
   return $stat
 }
 
-#Rewrite mode...
+get_current_ip() {
+ debug "running get_current_ip for $RECORD"
+ current_ip=$(dig +short $RECORD)
+ debug "get_current_ip returning ${current_ip}"
+}
 
+
+get_public_ip(){
 # Get my public IP
 for finder in ${IP_FINDER_LIST}
 do
   debug "checking from ${finder}"
-  IPADDR=$(wget -qO- ${finder})
-  debug "returned ${IPADDR}"
-  if (is_valid_ip ${IPADDR} && is_public_ip ${IPADDR}) 
+  public_ip=$(wget -qO- ${finder})
+  debug "returned ${public_ip}"
+  if is_public_ip $public_ip && is_valid_ip $public_ip
   then
    break
   fi
 done
+}
 
-debug "IP returned is "${IPADDR}"
 
-# Do the do...
+# get our public IP and the record'dcurrent IP
+get_public_ip
+get_current_ip
+
+# Do we need to do anything?
+[ "$current_ip" = "$public_ip" ] && bail "current ip for $RECORD is $current_ip, public ip is $public_ip, therefore no change required"
+
 case $resolver in 
  nsone)
 # NSOne version
+ debug "calling NSONE to update IP record for $RECORD to $public_ip"
 curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
  "answers": [
   {
    "answer": [
-    "'$IPADDR'"
+    "'$public_ip'"
    ]
   }
  ]
@@ -86,7 +103,8 @@ curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
 ;;
  aws)
 # AWS version 
- aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$IPADDR'" } ] } } ] }' 
+ debug "calling AWS to update IP record for $RECORD to $public_ip"
+ aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$public_ip'" } ] } } ] }' 
  ;;
   *) bail "Invalid resolver specified: ${resolver}" 
  ;;
