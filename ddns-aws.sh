@@ -7,7 +7,7 @@ AWSZONE="Z159W85ZCGY57D" # Zone according to AWS
 RECORD="fukka.co.uk" # Record you want to change within the zone
 IP_FINDER_LIST="http://bot.whatismyipaddress.com http://ipinfo.io/ip"
 resolver="aws"
-debug=true
+debug=false
 
 # Get me the fuck out of here!
 function bail() {
@@ -17,7 +17,7 @@ function bail() {
 
 # Make some NOISE!
 function debug() {
-debug=true && echo "DEBUG: $1"
+[ $debug = "true" ] && echo "DEBUG: $1"
 }
 
 # Nicked from the interwebs, not by me but original author of this script - uncredited :(
