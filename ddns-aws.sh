@@ -9,24 +9,18 @@ IP_FINDER_LIST="http://bot.whatismyipaddress.com http://ipinfo.io/ip"
 resolver="aws"
 debug=true
 
-# To Do:
-# Check current ip is valid, external IP - DONE
-# check it isn't the currently registered IP
-# Register it if needed
-
-# Rename the functions to something more descriptive - DONE
-
-#copied from http://www.linuxjournal.com/content/validating-ip-address-bash-script
-
+# Get me the fuck out of here!
 function bail() {
  echo "Bailing out:$1"
  exit 1
  }
 
+# Make some NOISE!
 function debug() {
 debug=true && echo "DEBUG: $1"
 }
 
+# Nicked from the interwebs, not by me but original author of this script - uncredited :(
 function is_valid_ip()
 {
   local ip=$1
@@ -54,9 +48,9 @@ function is_public_ip()
   return $stat
 }
 
-#Rewrite mode...
 
-# Get my public IP
+# Loop through all the tools in IP_FINDER_LIST, Get my public IP, validate in and move on if we're happy or
+# continue the loop if we're not.
 for finder in ${IP_FINDER_LIST}
 do
   debug "checking from ${finder}"
