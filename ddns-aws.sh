@@ -2,10 +2,11 @@
 
 # Set yo shit up!!
 APIKEY="7a4gElr2E9mIwnMwLbSj"
-ZONE="fukka.co.uk" # Zone according to nsone
-AWSZONE="Z159W85ZCGY57D" # Zone according to AWS
-RECORD="fukka.co.uk" # Record you want to change within the zone
+NSONE_ZONE="fukka.co.uk"    # Zone according to nsone
+AWS_ZONE="Z159W85ZCGY57D"   # Zone according to AWS
+RECORD="fukka.co.uk"        # Record you want to change within the zone
 IP_FINDER_LIST="http://bot.whatismyipaddress.com http://ipinfo.io/ip"
+PATH=""                     # End with trailing / because I'm lazy
 resolver="aws"
 debug=false
 
@@ -78,8 +79,8 @@ done
 
 
 # get our public IP and the record'dcurrent IP
-get_public_ip
-get_current_ip
+get_public_ip || bail "Failed to run get_public_ip"
+get_current_ip || bail "failed to run get_current_ip"
 
 # Do we need to do anything?
 [ "$current_ip" = "$public_ip" ] && bail "current ip for $RECORD is $current_ip, public ip is $public_ip, therefore no change required"
@@ -96,12 +97,13 @@ curl -X POST -H "X-NSONE-Key: $APIKEY" -d '{
    ]
   }
  ]
-}' https://api.nsone.net/v1/zones/$ZONE/$RECORD/A 
+}' https://api.nsone.net/v1/zones/$NSONE_ZONE/$RECORD/A 
 ;;
  aws)
 # AWS version 
  debug "calling AWS to update IP record for $RECORD to $public_ip"
- aws route53 change-resource-record-sets --hosted-zone-id ${AWSZONE} --change-batch '{ "Comment": "Testing update of a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$public_ip'" } ] } } ] }' 
+ type ${PATH}aws >/dev/null 2>&1 || bail "aws cli not found in path. install it or add the path in the config!"
+ ${PATH}aws route53 change-resource-record-sets --hosted-zone-id ${AWS_ZONE} --change-batch '{ "Comment": "ddns.sh called to update a record", "Changes": [ { "Action": "UPSERT", "ResourceRecordSet":{ "Name": "'$RECORD'", "Type": "A", "TTL": 100, "ResourceRecords": [ { "Value": "'$public_ip'" } ] } } ] }'  || bail "AWS Update Failed"
  ;;
   *) bail "Invalid resolver specified: ${resolver}" 
  ;;
