@@ -1,3 +1,9 @@
+//TODO
+// write IP checker to make sure we're not getting BS responses
+// Do authoritative DNS lookup rather than just address?
+// Replace bail() with a system function? Panic or os.exit maybe?
+// tidy up the debug messages
+
 package main
 
 import (
@@ -30,7 +36,6 @@ func main() {
 	fGetConfig()
 	f_debug("In function")
 
-	//if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
 	if fGetCurrentIp() == fGetCurrentDns() {
 		fmt.Println("IPs match - not changing record")
 	} else {
@@ -66,7 +71,6 @@ func fGetConfig() {
 }
 
 func fGetCurrentIp() string {
-	// need to spot bullshit responses from here...
 	f_debug("In function")
 	var (
 		//body   string
@@ -99,14 +103,12 @@ func fGetCurrentDns() string {
 	//f_debug("Current DNS entry: " + strings.Join(currentIps, "."))
 	fmt.Printf("Format: %F", currentIps)
 	for _, ip := range currentIps {
-		fmt.Printf("Address: %s\n", ip.String())
 		f_debug("DNS check returning " + ip.String())
-
 		return ip.String()
 	}
 	//return strings.Join(currentIps, ".")
 	f_debug("fell out of the loop")
-	return "ok"
+	return "fell out of the loop"
 
 }
 
