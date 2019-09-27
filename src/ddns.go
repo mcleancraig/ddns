@@ -101,7 +101,6 @@ func fGetCurrentDns() string {
 	f_debug("In function")
 	currentIps, _ := net.LookupIP(viper.GetString("record"))
 	//f_debug("Current DNS entry: " + strings.Join(currentIps, "."))
-	fmt.Printf("Format: %F", currentIps)
 	for _, ip := range currentIps {
 		f_debug("DNS check returning " + ip.String())
 		return ip.String()
