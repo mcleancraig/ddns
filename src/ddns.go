@@ -20,6 +20,7 @@ func f_debug(msg string) {
 		fmt.Println("DEBUG FROM: " + cname + " : " + msg)
 	}
 }
+
 func bail(msg error) {
 	f_debug("In function")
 	panic(fmt.Errorf("Fatal error : %s \n", msg))
@@ -30,9 +31,9 @@ func main() {
 	f_debug("In function")
 
 	if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
-		f_debug("IPs match - not changing record")
+		fmt.Print("IPs match - not changing record")
 	} else {
-		f_debug("IPs do not match - updating!")
+		fmt.Print("IPs do not match - updating!")
 		resolver := viper.GetString("resolver")
 		switch resolver {
 		case "aws":
