@@ -32,14 +32,13 @@ func main() {
 	if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
 		f_debug("IPs match - not changing record")
 	} else {
-		fmt.Printf("Current: %v, type: %T. My IP: %v, type %T\n", fGetCurrentDns(), fGetCurrentDns(), fGetCurrentIp(), fGetCurrentIp())
 		f_debug("IPs do not match - updating!")
 		resolver := viper.GetString("resolver")
 		switch resolver {
 		case "aws":
 			sess, err := session.NewSession()
 			if err != nil {
-				fmt.Println("failed to create session,", err)
+				bail(err)
 				return
 			}
 			svc := route53.New(sess)
@@ -70,7 +69,6 @@ func fGetCurrentIp() string {
 		//body   string
 		finder = viper.GetStringSlice("ip_finder")
 	)
-	fmt.Printf("Type: %T,  Size: %d \n", finder, len(finder))
 	for i, v := range finder {
 		fmt.Printf("Index: %d, Value: %v\n", i, v)
 		resp, err := http.Get(v)
@@ -84,7 +82,6 @@ func fGetCurrentIp() string {
 			}
 			_ = resp.Body.Close()
 			f_debug("Current IP address reported as: " + string(body))
-			fmt.Printf("Type: %T\n", string(body))
 
 			return (strings.TrimSpace(string(body)))
 
@@ -98,7 +95,6 @@ func fGetCurrentDns() string {
 	f_debug("In function")
 	current_dns, _ := net.LookupHost(viper.GetString("record"))
 	f_debug("Current DNS entry: " + strings.Join(current_dns, "."))
-	fmt.Printf("Type: %T\n", strings.Join(current_dns, "."))
 
 	return strings.Join(current_dns, ".")
 
