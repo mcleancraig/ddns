@@ -118,13 +118,12 @@ func fChangeAWS(svc *route53.Route53) {
 					ResourceRecordSet: &route53.ResourceRecordSet{ // Required
 						Name: aws.String(viper.GetString("record")), // Required
 						Type: aws.String("A"),                       // Required
+						TTL:  aws.Int64(600),
 						ResourceRecords: []*route53.ResourceRecord{
 							{ // Required
 								Value: aws.String(fGetCurrentIp()), // Required
 							},
 						},
-						TTL:    aws.Int64(600),
-						Weight: aws.Int64(1),
 					},
 				},
 			},
