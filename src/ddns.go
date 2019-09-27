@@ -31,9 +31,9 @@ func main() {
 	f_debug("In function")
 
 	if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
-		fmt.Print("IPs match - not changing record")
+		fmt.Println("IPs match - not changing record")
 	} else {
-		fmt.Print("IPs do not match - updating!")
+		fmt.Println("IPs do not match - updating!")
 		resolver := viper.GetString("resolver")
 		switch resolver {
 		case "aws":
