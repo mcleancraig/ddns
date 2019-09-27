@@ -28,16 +28,11 @@ func bail(msg error) {
 func main() {
 	fGetConfig()
 	f_debug("In function")
-	//currentDns := fGetCurrentDns()
-	//f_debug("Current DNS passed back is: " + fGetCurrentDns())
-	//currentIP: = fGetCurrentIp()
-	//f_debug("current reported IP is: " + fGetCurrentIp())
-	//fChangeIfNeeded()
 
-	if fGetCurrentDns() == fGetCurrentIp() {
+	if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
 		f_debug("IPs match - not changing record")
 	} else {
-		fmt.Printf("Current: %v, type: %T. My IP: %v, type %T", fGetCurrentDns(), fGetCurrentDns(), fGetCurrentIp(), fGetCurrentIp())
+		fmt.Printf("Current: %v, type: %T. My IP: %v, type %T\n", fGetCurrentDns(), fGetCurrentDns(), fGetCurrentIp(), fGetCurrentIp())
 		f_debug("IPs do not match - updating!")
 		resolver := viper.GetString("resolver")
 		switch resolver {
@@ -91,7 +86,7 @@ func fGetCurrentIp() string {
 			f_debug("Current IP address reported as: " + string(body))
 			fmt.Printf("Type: %T\n", string(body))
 
-			return string(body)
+			return (strings.TrimSpace(string(body)))
 
 		}
 	}
