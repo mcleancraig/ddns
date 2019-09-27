@@ -56,7 +56,7 @@ func fGetConfig() {
 	viper.SetConfigName("ddns")
 	viper.AddConfigPath("$HOME/.ddns/")
 	viper.AddConfigPath("/etc/ddns/")
-	viper.SetDefault("debug", true)
+	//	viper.SetDefault("debug", true)
 	f_debug("In function")
 	err := viper.ReadInConfig()
 	if err != nil {
