@@ -2,6 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/spf13/viper"
 	"io/ioutil"
 	"net"
@@ -34,7 +37,21 @@ func main() {
 	if fGetCurrentDns() == fGetCurrentIp() {
 		f_debug("IPs match - not changing record")
 	} else {
-		f_debug("call out to change function")
+		resolver := viper.GetString("resolver")
+		switch resolver {
+		case "aws":
+			sess, err := session.NewSession()
+			if err != nil {
+				fmt.Println("failed to create session,", err)
+				return
+			}
+			svc := route53.New(sess)
+			fChangeAWS(svc)
+		case "nsone":
+			fChangeNSONE()
+		default:
+			f_debug("resolver not set in config, or set to incorrect value")
+		}
 	}
 }
 
@@ -86,6 +103,35 @@ func fGetCurrentDns() string {
 
 }
 
-func fChangeIfNeeded() {
+func fChangeAWS(svc *route53.Route53) {
+
+	params := &route53.ChangeResourceRecordSetsInput{
+		ChangeBatch: &route53.ChangeBatch{ // Required
+			Changes: []*route53.Change{ // Required
+				{ // Required
+					Action: aws.String("UPSERT"), // Required
+					ResourceRecordSet: &route53.ResourceRecordSet{ // Required
+						Name: aws.String(viper.GetString("record")), // Required
+						Type: aws.String("A"),                       // Required
+						ResourceRecords: []*route53.ResourceRecord{
+							{ // Required
+								Value: aws.String(viper.GetString("record")), // Required
+							},
+						},
+						TTL:           aws.Int64(600),
+						Weight:        aws.Int64(1),
+						SetIdentifier: aws.String("Changed by ddns"),
+					},
+				},
+			},
+			Comment: aws.String("Changed by ddns script"),
+		},
+		HostedZoneId: aws.String(viper.GetString("aws_zone")), // Required
+	}
+	resp, err := svc.ChangeResourceRecordSets(params)
+	fmt.Printf("%v: %v\n", err, resp)
+}
+
+func fChangeNSONE() {
 
 }
