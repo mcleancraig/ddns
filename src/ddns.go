@@ -37,6 +37,7 @@ func main() {
 	if fGetCurrentDns() == fGetCurrentIp() {
 		f_debug("IPs match - not changing record")
 	} else {
+		f_debug("IPs do not match - updating!")
 		resolver := viper.GetString("resolver")
 		switch resolver {
 		case "aws":
@@ -87,6 +88,8 @@ func fGetCurrentIp() string {
 			}
 			_ = resp.Body.Close()
 			f_debug("Current IP address reported as: " + string(body))
+			fmt.Printf("Type: %T\n", string(body))
+
 			return string(body)
 
 		}
@@ -99,6 +102,8 @@ func fGetCurrentDns() string {
 	f_debug("In function")
 	current_dns, _ := net.LookupHost(viper.GetString("record"))
 	f_debug("Current DNS entry: " + strings.Join(current_dns, "."))
+	fmt.Printf("Type: %T\n", strings.Join(current_dns, "."))
+
 	return strings.Join(current_dns, ".")
 
 }
