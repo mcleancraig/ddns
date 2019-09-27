@@ -123,9 +123,8 @@ func fChangeAWS(svc *route53.Route53) {
 								Value: aws.String(fGetCurrentIp()), // Required
 							},
 						},
-						TTL:           aws.Int64(600),
-						Weight:        aws.Int64(1),
-						SetIdentifier: aws.String("Changed by ddns"),
+						TTL:    aws.Int64(600),
+						Weight: aws.Int64(1),
 					},
 				},
 			},
