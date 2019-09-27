@@ -37,6 +37,7 @@ func main() {
 	if fGetCurrentDns() == fGetCurrentIp() {
 		f_debug("IPs match - not changing record")
 	} else {
+		fmt.Printf("Current: %v, type: %T. My IP: %v, type %T", fGetCurrentDns(), fGetCurrentDns(), fGetCurrentIp(), fGetCurrentIp())
 		f_debug("IPs do not match - updating!")
 		resolver := viper.GetString("resolver")
 		switch resolver {
