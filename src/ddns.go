@@ -69,7 +69,7 @@ func fGetCurrentIp() string {
 		//body   string
 		finder = viper.GetStringSlice("ip_finder")
 	)
-	for i, v := range finder {
+	for _, v := range finder {
 		resp, err := http.Get(v)
 		if err != nil {
 			bail(err)
