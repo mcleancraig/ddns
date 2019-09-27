@@ -115,7 +115,7 @@ func fChangeAWS(svc *route53.Route53) {
 						Type: aws.String("A"),                       // Required
 						ResourceRecords: []*route53.ResourceRecord{
 							{ // Required
-								Value: aws.String(viper.GetString("record")), // Required
+								Value: aws.String(fGetCurrentIp()), // Required
 							},
 						},
 						TTL:           aws.Int64(600),
