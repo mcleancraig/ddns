@@ -30,7 +30,8 @@ func main() {
 	fGetConfig()
 	f_debug("In function")
 
-	if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
+	//if strings.TrimRight(fGetCurrentDns(), "\n") == strings.TrimRight(fGetCurrentIp(), "\n") {
+	if fGetCurrentIp() == fGetCurrentDns() {
 		fmt.Println("IPs match - not changing record")
 	} else {
 		fmt.Println("IPs do not match - updating!")
@@ -94,10 +95,18 @@ func fGetCurrentIp() string {
 func fGetCurrentDns() string {
 	// need to do authoritative lookup here, avoid cache
 	f_debug("In function")
-	current_dns, _ := net.LookupHost(viper.GetString("record"))
-	f_debug("Current DNS entry: " + strings.Join(current_dns, "."))
+	currentIps, _ := net.LookupIP(viper.GetString("record"))
+	//f_debug("Current DNS entry: " + strings.Join(currentIps, "."))
+	fmt.Printf("Format: %F", currentIps)
+	for _, ip := range currentIps {
+		fmt.Printf("Address: %s\n", ip.String())
+		f_debug("DNS check returning " + ip.String())
 
-	return strings.Join(current_dns, ".")
+		return ip.String()
+	}
+	//return strings.Join(currentIps, ".")
+	f_debug("fell out of the loop")
+	return "ok"
 
 }
 
