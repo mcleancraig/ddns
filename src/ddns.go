@@ -7,112 +7,124 @@
 package main
 
 import (
-	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
-	"runtime"
+	"os"
 	"strings"
 )
 
-func f_debug(msg string) {
-	if viper.Get("debug") == true {
-		caller, _, _, _ := runtime.Caller(1)
-		cname := runtime.FuncForPC(caller).Name()
-		fmt.Println("DEBUG FROM: " + cname + " : " + msg)
+func main() {
+	fGetConfig()
+	if viper.GetString("debug") == "true" {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+	logrus.Debug("In main")
+	fCompareAndRun()
+}
+
+//func f_debug(msg string) {
+//	if viper.Get("debug") == true {
+//		caller, _, _, _ := runtime.Caller(1)
+//		cname := runtime.FuncForPC(caller).Name()
+//		fmt.Println("DEBUG FROM: " + cname + " : " + msg)
+//	}
+//}
+
+//func bail(msg error) {
+//	f_debug("In function")
+//	panic(fmt.Errorf("Fatal error : %s \n", msg))
+//}
+
+func fCompareAndRun() {
+	logrus.Debug("In function fCompareAndRun")
+	currentIP := fGetCurrentIp()
+	currentDNS := fGetCurrentDns()
+	if currentIP == currentDNS {
+		logrus.Info("ip matches dns, no change required")
+		os.Exit(0)
+	} else {
+		logrus.Info("ip doesn't match dns - update wanted")
+		fChangeIP(currentIP)
 	}
 }
 
-func bail(msg error) {
-	f_debug("In function")
-	panic(fmt.Errorf("Fatal error : %s \n", msg))
-}
-
-func main() {
-	fGetConfig()
-	f_debug("In function")
-
-	if fGetCurrentIp() == fGetCurrentDns() {
-		fmt.Println("IPs match - not changing record")
-	} else {
-		fmt.Println("IPs do not match - updating!")
-		resolver := viper.GetString("resolver")
-		switch resolver {
-		case "aws":
-			sess, err := session.NewSession()
-			if err != nil {
-				bail(err)
-				return
-			}
-			svc := route53.New(sess)
-			fChangeAWS(svc)
-		case "nsone":
-			fChangeNSONE()
-		default:
-			f_debug("resolver not set in config, or set to incorrect value")
-		}
+func fChangeIP(requestedIP string) {
+	logrus.Debug("In function fChangeIP")
+	resolver := viper.GetString("resolver")
+	switch resolver {
+	case "aws":
+		fChangeAWS(requestedIP)
+	case "nsone":
+		fChangeNSONE()
+	default:
+		log.Fatal("resolver not set in config, or set to incorrect value")
 	}
 }
 
 func fGetConfig() {
+	logrus.Debug("In function fGetConfig")
 	viper.SetConfigName("ddns")
 	viper.AddConfigPath("$HOME/.ddns/")
 	viper.AddConfigPath("/etc/ddns/")
-	//	viper.SetDefault("debug", true)
-	f_debug("In function")
 	err := viper.ReadInConfig()
 	if err != nil {
-		bail(err)
+		logrus.Errorf("%v", err)
 	}
 }
 
 func fGetCurrentIp() string {
-	f_debug("In function")
+	logrus.Debug("In fGetCurrentIP")
 	var (
-		//body   string
 		finder = viper.GetStringSlice("ip_finder")
 	)
 	for _, v := range finder {
 		resp, err := http.Get(v)
 		if err != nil {
-			bail(err)
+			logrus.Error("from %s: %v", v, err)
 		} else {
 			defer resp.Body.Close()
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				bail(err)
+				logrus.Errorf("from %s: %v", v, err)
 			}
-			_ = resp.Body.Close()
-			f_debug("Current IP address reported as: " + string(body))
+			logrus.Info("Current IP address reported as: " + string(body))
 
 			return (strings.TrimSpace(string(body)))
 
 		}
 	}
-	return "Failed to get IP"
+	logrus.Fatal("Failed to get IP")
+	return "get IP failed"
 }
 
 func fGetCurrentDns() string {
 	// need to do authoritative lookup here, avoid cache
-	f_debug("In function")
-	currentIps, _ := net.LookupIP(viper.GetString("record"))
-	//f_debug("Current DNS entry: " + strings.Join(currentIps, "."))
-	for _, ip := range currentIps {
-		f_debug("DNS check returning " + ip.String())
+	logrus.Debug("In function fGetCurrentDns")
+	currentAddress, _ := net.LookupIP(viper.GetString("record"))
+	for _, ip := range currentAddress {
+		logrus.Info("current DNS reported as " + ip.String())
 		return ip.String()
 	}
-	//return strings.Join(currentIps, ".")
-	f_debug("fell out of the loop")
-	return "fell out of the loop"
+	logrus.Fatal("fell out of the loop")
+	return "DNS lookup failed"
 
 }
 
-func fChangeAWS(svc *route53.Route53) {
+func fChangeAWS(requestedIP string) {
+	logrus.Debug("In function fChangeAWS")
 
+	sess, err := session.NewSession()
+	if err != nil {
+		log.Fatal("Failed to open AWS session")
+	}
+	svc := route53.New(sess)
 	params := &route53.ChangeResourceRecordSetsInput{
 		ChangeBatch: &route53.ChangeBatch{ // Required
 			Changes: []*route53.Change{ // Required
@@ -124,7 +136,7 @@ func fChangeAWS(svc *route53.Route53) {
 						TTL:  aws.Int64(600),
 						ResourceRecords: []*route53.ResourceRecord{
 							{ // Required
-								Value: aws.String(fGetCurrentIp()), // Required
+								Value: aws.String(requestedIP), // Required
 							},
 						},
 					},
@@ -134,10 +146,13 @@ func fChangeAWS(svc *route53.Route53) {
 		},
 		HostedZoneId: aws.String(viper.GetString("aws_zone")), // Required
 	}
-	resp, err := svc.ChangeResourceRecordSets(params)
-	fmt.Printf("%v: %v\n", err, resp)
+
+	_, err = svc.ChangeResourceRecordSets(params)
+	if err != nil {
+		log.Fatalf("AWS Failed to update!:\n %v, %v", err)
+	}
 }
 
 func fChangeNSONE() {
-
+	logrus.Debug("This needs to be written!")
 }
