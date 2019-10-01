@@ -1,5 +1,4 @@
 //TODO
-// write IP checker to make sure we're not getting BS responses
 // Do authoritative DNS lookup rather than just address?
 
 package main
