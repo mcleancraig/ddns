@@ -1,8 +1,6 @@
 //TODO
 // write IP checker to make sure we're not getting BS responses
 // Do authoritative DNS lookup rather than just address?
-// Replace bail() with a system function? Panic or os.exit maybe?
-// tidy up the debug messages
 
 package main
 
@@ -29,24 +27,18 @@ func main() {
 	fCompareAndRun()
 }
 
-//func f_debug(msg string) {
-//	if viper.Get("debug") == true {
-//		caller, _, _, _ := runtime.Caller(1)
-//		cname := runtime.FuncForPC(caller).Name()
-//		fmt.Println("DEBUG FROM: " + cname + " : " + msg)
-//	}
-//}
-
-//func bail(msg error) {
-//	f_debug("In function")
-//	panic(fmt.Errorf("Fatal error : %s \n", msg))
-//}
-
 func fCompareAndRun() {
 	logrus.Debug("In function fCompareAndRun")
-	currentIP := fGetCurrentIp()
-	currentDNS := fGetCurrentDns()
-	if currentIP == currentDNS {
+	currentIP := net.ParseIP(fGetCurrentIp())
+	currentDNS := net.ParseIP(fGetCurrentDns())
+	if currentIP == nil {
+		logrus.Fatal("Current IP is not valid")
+	}
+	if currentDNS == nil {
+		logrus.Fatal("Current DNS is not valid")
+	}
+
+	if string(currentIP) == string(currentDNS) {
 		logrus.Info("ip matches dns, no change required")
 		os.Exit(0)
 	} else {
@@ -55,7 +47,7 @@ func fCompareAndRun() {
 	}
 }
 
-func fChangeIP(requestedIP string) {
+func fChangeIP(requestedIP net.IP) {
 	logrus.Debug("In function fChangeIP")
 	resolver := viper.GetString("resolver")
 	switch resolver {
@@ -117,7 +109,7 @@ func fGetCurrentDns() string {
 
 }
 
-func fChangeAWS(requestedIP string) {
+func fChangeAWS(requestedIP net.IP) {
 	logrus.Debug("In function fChangeAWS")
 
 	sess, err := session.NewSession()
@@ -136,7 +128,7 @@ func fChangeAWS(requestedIP string) {
 						TTL:  aws.Int64(600),
 						ResourceRecords: []*route53.ResourceRecord{
 							{ // Required
-								Value: aws.String(requestedIP), // Required
+								Value: aws.String(string(requestedIP)), // Required
 							},
 						},
 					},
