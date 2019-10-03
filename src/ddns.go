@@ -37,11 +37,11 @@ func compareAndRun() (err error) {
 	logrus.Debug("In function compareAndRun")
 	currentIP, err := getCurrentIp()
 	if err != nil {
-		return err
+		return
 	}
 	currentDNS, err := getCurrentDns()
 	if err != nil {
-		return err
+		return
 	}
 	if currentIP == nil {
 		return errors.New("Current IP is not valid")
@@ -57,7 +57,7 @@ func compareAndRun() (err error) {
 		logrus.Info("ip doesn't match dns - update wanted")
 		err = changeIP(currentIP)
 		if err != nil {
-			return err
+			return
 		} else {
 			return nil
 		}
@@ -71,7 +71,7 @@ func changeIP(requestedIP net.IP) (err error) {
 	case "aws":
 		err = changeAWS(requestedIP)
 		if err != nil {
-			return err
+			return
 		}
 	case "nsone":
 		changeNSONE()
@@ -88,13 +88,13 @@ func getConfig() (err error) {
 	viper.AddConfigPath("/etc/ddns/")
 	err = viper.ReadInConfig()
 	if err != nil {
-		return err
+		return
 		// logrus.Errorf("%v", err)
 	}
 	return nil
 }
 
-func getCurrentIp() (net.IP, error) {
+func getCurrentIp() (_ net.IP, err error) {
 	logrus.Debug("In getCurrentIP")
 	var (
 		finder = viper.GetStringSlice("ip_finder")
@@ -102,24 +102,27 @@ func getCurrentIp() (net.IP, error) {
 	for _, v := range finder {
 		resp, err := http.Get(v)
 		if err != nil {
-			logrus.Error("from %s: %v", v, err)
+			logrus.Errorf("from %s: %v", v, err)
 		} else {
 			defer resp.Body.Close()
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				logrus.Errorf("from %s: %v", v, err)
 			}
-			logrus.Info("Current IP address reported as: " + string(body))
+			reportedIp := net.ParseIP(strings.TrimSpace(string(body)))
+			logrus.Debugf("response from %v was: %v ", v, string(body))
+			if reportedIp != nil {
+				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIp)
 
-			return net.ParseIP(strings.TrimSpace(string(body))), nil
+				return reportedIp, nil
+			}
 
 		}
 	}
-	// logrus.Fatal("Failed to get IP")
 	return net.ParseIP(""), errors.New("get IP failed")
 }
 
-func getCurrentDns() (net.IP, error) {
+func getCurrentDns() (_ net.IP, err error) {
 	// need to do authoritative lookup here, avoid cache
 	logrus.Debug("In function getCurrentDns")
 	currentAddress, _ := net.LookupIP(viper.GetString("record"))
@@ -132,7 +135,7 @@ func getCurrentDns() (net.IP, error) {
 
 }
 
-func changeAWS(requestedIP net.IP) error {
+func changeAWS(requestedIP net.IP) (err error) {
 	logrus.Debug("In function changeAWS")
 
 	sess, err := session.NewSession()
