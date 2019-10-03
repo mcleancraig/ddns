@@ -51,6 +51,7 @@ func compareAndRun() (err error) {
 	}
 
 	if string(currentIP) == string(currentDNS) {
+		logrus.Info("IPs match - no action required")
 		return nil
 	} else {
 		logrus.Info("ip doesn't match dns - update wanted")
