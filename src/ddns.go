@@ -110,7 +110,7 @@ func getCurrentIp() (net.IP, error) {
 			}
 			logrus.Info("Current IP address reported as: " + string(body))
 
-			return (net.ParseIP(strings.TrimSpace(string(body)))), nil
+			return net.ParseIP(strings.TrimSpace(string(body))), nil
 
 		}
 	}
