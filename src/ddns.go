@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
@@ -49,19 +50,21 @@ func compareAndRun() (err error) {
 	if currentDNS == nil {
 		return errors.New("Current DNS is not valid")
 	}
-
-	if string(currentIP) == string(currentDNS) {
-		logrus.Info("IPs match - no action required")
-		return nil
-	} else {
-		logrus.Info("ip doesn't match dns - update wanted")
-		err = changeIP(currentIP)
-		if err != nil {
-			return
-		} else {
+	for dns_resp := range currentIP {
+		//if string(currentIP) == string(currentDNS) {
+		if string(currentIP) == string(dns_resp) {
+			logrus.Info("IPs match - no action required")
 			return nil
 		}
 	}
+	logrus.Info("ip doesn't match dns - update wanted")
+	err = changeIP(currentIP)
+	if err != nil {
+		return
+	} else {
+		return nil
+	}
+
 }
 
 func changeIP(requestedIP net.IP) (err error) {
@@ -94,8 +97,8 @@ func getConfig() (err error) {
 	return nil
 }
 
-func getCurrentIp() (_ net.IP, err error) {
-	logrus.Debug("In getCurrentIP")
+func getCurrentIp() (reportedIP net.IP, err error) {
+	logrus.Debug("In function getCurrentIP")
 	var (
 		finder = viper.GetStringSlice("ip_finder")
 	)
@@ -115,6 +118,7 @@ func getCurrentIp() (_ net.IP, err error) {
 				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIp)
 
 				return reportedIp, nil
+
 			}
 
 		}
@@ -122,16 +126,45 @@ func getCurrentIp() (_ net.IP, err error) {
 	return net.ParseIP(""), errors.New("get IP failed")
 }
 
-func getCurrentDns() (_ net.IP, err error) {
+func getCurrentDns() (_ []net.IPAddr, err error) {
 	// need to do authoritative lookup here, avoid cache
+
+	// lookup NS servers
+	// fall out if no NS records found
+	// loop through servers
+	// lookup target on server
+	// return if found
+	// fall out if not
 	logrus.Debug("In function getCurrentDns")
-	currentAddress, _ := net.LookupIP(viper.GetString("record"))
-	for _, ip := range currentAddress {
-		logrus.Info("current DNS reported as " + ip.String())
-		return net.ParseIP(ip.String()), nil
+	nameservers, err := net.LookupNS(viper.GetString("record"))
+	if err != nil {
+		return nil, err
 	}
-	logrus.Fatal("fell out of the loop")
-	return net.ParseIP("Failed"), errors.New("DNS lookup failed")
+	for _, ns := range nameservers {
+		nshost := ns.Host
+		logrus.Debugf("Looking up %v against %v", viper.GetString("record"), nshost)
+		resolver := &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{}
+				return d.DialContext(ctx, "udp", net.JoinHostPort(nshost, "53"))
+			},
+		}
+		resp, err := resolver.LookupIPAddr(context.Background(), viper.GetString("record"))
+		if err != nil {
+			return nil, errors.Errorf("error from resolver: %v", err)
+		}
+		return resp, nil
+
+	}
+	return nil, errors.New("Fell out of nameserver loop without getting any results")
+	//currentAddress, _ := net.LookupIP(viper.GetString("record"))
+	//for _, ip := range currentAddress {
+	//	logrus.Info("current DNS reported as " + ip.String())
+	//	return net.ParseIP(ip.String()), nil
+	//}
+	//logrus.Fatal("fell out of the loop")
+	//return net.ParseIP("Failed"), errors.New("DNS lookup failed")
 
 }
 
