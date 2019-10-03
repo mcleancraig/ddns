@@ -7,70 +7,93 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 )
 
 func main() {
-	getConfig()
+	var err error
+	err = getConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
 	if viper.GetString("debug") == "true" {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 	logrus.Debug("In main")
-	compareAndRun()
+	err = compareAndRun()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
-func compareAndRun() {
+func compareAndRun() (err error) {
 	logrus.Debug("In function compareAndRun")
-	currentIP := net.ParseIP(getCurrentIp())
-	currentDNS := net.ParseIP(getCurrentDns())
+	currentIP, err := getCurrentIp()
+	if err != nil {
+		return err
+	}
+	currentDNS, err := getCurrentDns()
+	if err != nil {
+		return err
+	}
 	if currentIP == nil {
-		logrus.Fatal("Current IP is not valid")
+		return errors.New("Current IP is not valid")
 	}
 	if currentDNS == nil {
-		logrus.Fatal("Current DNS is not valid")
+		return errors.New("Current DNS is not valid")
 	}
 
 	if string(currentIP) == string(currentDNS) {
-		logrus.Info("ip matches dns, no change required")
-		os.Exit(0)
+		return nil
 	} else {
 		logrus.Info("ip doesn't match dns - update wanted")
-		changeIP(currentIP)
+		err = changeIP(currentIP)
+		if err != nil {
+			return err
+		} else {
+			return nil
+		}
 	}
 }
 
-func changeIP(requestedIP net.IP) {
+func changeIP(requestedIP net.IP) (err error) {
 	logrus.Debug("In function changeIP")
 	resolver := viper.GetString("resolver")
 	switch resolver {
 	case "aws":
-		changeAWS(requestedIP)
+		err = changeAWS(requestedIP)
+		if err != nil {
+			return err
+		}
 	case "nsone":
 		changeNSONE()
 	default:
-		log.Fatal("resolver not set in config, or set to incorrect value")
+		return errors.New("resolver not set in config, or set to incorrect value")
 	}
+	return errors.New("we should never get here, fell off the switch in changeIP")
 }
 
-func getConfig() {
+func getConfig() (err error) {
 	logrus.Debug("In function getConfig")
 	viper.SetConfigName("ddns")
 	viper.AddConfigPath("$HOME/.ddns/")
 	viper.AddConfigPath("/etc/ddns/")
-	err := viper.ReadInConfig()
+	err = viper.ReadInConfig()
 	if err != nil {
-		logrus.Errorf("%v", err)
+		return err
+		// logrus.Errorf("%v", err)
 	}
+	return nil
 }
 
-func getCurrentIp() string {
+func getCurrentIp() (net.IP, error) {
 	logrus.Debug("In getCurrentIP")
 	var (
 		finder = viper.GetStringSlice("ip_finder")
@@ -87,33 +110,33 @@ func getCurrentIp() string {
 			}
 			logrus.Info("Current IP address reported as: " + string(body))
 
-			return (strings.TrimSpace(string(body)))
+			return (net.ParseIP(strings.TrimSpace(string(body)))), nil
 
 		}
 	}
-	logrus.Fatal("Failed to get IP")
-	return "get IP failed"
+	// logrus.Fatal("Failed to get IP")
+	return net.ParseIP(""), errors.New("get IP failed")
 }
 
-func getCurrentDns() string {
+func getCurrentDns() (net.IP, error) {
 	// need to do authoritative lookup here, avoid cache
 	logrus.Debug("In function getCurrentDns")
 	currentAddress, _ := net.LookupIP(viper.GetString("record"))
 	for _, ip := range currentAddress {
 		logrus.Info("current DNS reported as " + ip.String())
-		return ip.String()
+		return net.ParseIP(ip.String()), nil
 	}
 	logrus.Fatal("fell out of the loop")
-	return "DNS lookup failed"
+	return net.ParseIP("Failed"), errors.New("DNS lookup failed")
 
 }
 
-func changeAWS(requestedIP net.IP) {
+func changeAWS(requestedIP net.IP) error {
 	logrus.Debug("In function changeAWS")
 
 	sess, err := session.NewSession()
 	if err != nil {
-		log.Fatal("Failed to open AWS session")
+		return errors.Errorf("Failed to open AWS session: %v", err)
 	}
 	svc := route53.New(sess)
 	params := &route53.ChangeResourceRecordSetsInput{
@@ -140,8 +163,9 @@ func changeAWS(requestedIP net.IP) {
 
 	_, err = svc.ChangeResourceRecordSets(params)
 	if err != nil {
-		log.Fatalf("AWS Failed to update!:\n %v, %v", err)
+		return errors.Errorf("AWS Failed to update!:\n %v", err)
 	}
+	return nil
 }
 
 func changeNSONE() {
