@@ -1,0 +1,9 @@
+debug:  true
+api_key: "7a4gElr2E9mIwnMwLbSj"
+nsone_zone: "fukka.co.uk"    # Zone according to nsone
+aws_zone: "Z159W85ZCGY57D"   # Zone according to AWS
+record: "fukka.co.uk"        # Record you want to change within the zone
+ip_finder:
+- "http://ipinfo.io/ip"
+- "http://bot.whatismyipaddress.com"
+resolver: "aws"

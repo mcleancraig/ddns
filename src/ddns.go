@@ -50,12 +50,9 @@ func compareAndRun() (err error) {
 	if currentDNS == nil {
 		return errors.New("Current DNS is not valid")
 	}
-	for dns_resp := range currentIP {
-		//if string(currentIP) == string(currentDNS) {
-		if string(currentIP) == string(dns_resp) {
-			logrus.Info("IPs match - no action required")
-			return nil
-		}
+	if string(currentDNS) == string(currentIP) {
+		logrus.Info("IPs match - no action required")
+		return nil
 	}
 	logrus.Info("ip doesn't match dns - update wanted")
 	err = changeIP(currentIP)
@@ -103,11 +100,13 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 		finder = viper.GetStringSlice("ip_finder")
 	)
 	for _, v := range finder {
+		logrus.Debugf("Getting IP from %s", v)
 		resp, err := http.Get(v)
 		if err != nil {
 			logrus.Errorf("from %s: %v", v, err)
 		} else {
 			defer resp.Body.Close()
+			logrus.Debugf("Opening connection to %s", v)
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				logrus.Errorf("from %s: %v", v, err)
@@ -116,9 +115,10 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 			logrus.Debugf("response from %v was: %v ", v, string(body))
 			if reportedIp != nil {
 				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIp)
-
 				return reportedIp, nil
 
+			} else {
+ 				logrus.Errorf("Missed getting an IP from %s", v)	
 			}
 
 		}
@@ -126,7 +126,7 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 	return net.ParseIP(""), errors.New("get IP failed")
 }
 
-func getCurrentDns() (_ []net.IPAddr, err error) {
+func getCurrentDns() ( _ net.IP, err error) {
 	// need to do authoritative lookup here, avoid cache
 
 	// lookup NS servers
@@ -135,6 +135,7 @@ func getCurrentDns() (_ []net.IPAddr, err error) {
 	// lookup target on server
 	// return if found
 	// fall out if not
+	var outputIP net.IP
 	logrus.Debug("In function getCurrentDns")
 	nameservers, err := net.LookupNS(viper.GetString("record"))
 	if err != nil {
@@ -154,17 +155,15 @@ func getCurrentDns() (_ []net.IPAddr, err error) {
 		if err != nil {
 			return nil, errors.Errorf("error from resolver: %v", err)
 		}
-		return resp, nil
+		// Now we get an array back, so we need to find out what's in it
+		for _, name := range resp {
+			outputIP = net.ParseIP(name.String())
+			logrus.Infof("DNS Lookup returned %s from %v", outputIP, nshost)
+		}
+		return outputIP, nil
 
 	}
 	return nil, errors.New("Fell out of nameserver loop without getting any results")
-	//currentAddress, _ := net.LookupIP(viper.GetString("record"))
-	//for _, ip := range currentAddress {
-	//	logrus.Info("current DNS reported as " + ip.String())
-	//	return net.ParseIP(ip.String()), nil
-	//}
-	//logrus.Fatal("fell out of the loop")
-	//return net.ParseIP("Failed"), errors.New("DNS lookup failed")
 
 }
 
@@ -187,7 +186,7 @@ func changeAWS(requestedIP net.IP) (err error) {
 						TTL:  aws.Int64(600),
 						ResourceRecords: []*route53.ResourceRecord{
 							{ // Required
-								Value: aws.String(string(requestedIP)), // Required
+								Value: aws.String(requestedIP.String()), // Required
 							},
 						},
 					},
