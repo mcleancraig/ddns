@@ -115,7 +115,7 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 				logrus.Errorf("from %s: %v", v, err)
 			}
 			reportedIp := net.ParseIP(strings.TrimSpace(string(body)))
-			logrus.Debugf("response from %v was: %v ", v, string(body))
+			logrus.Debugf("response from %v was: %v ", v, string(reportedIP))
 			if reportedIp != nil {
 				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIp)
 				return reportedIp, nil
