@@ -31,6 +31,8 @@ func main() {
 	err = compareAndRun()
 	if err != nil {
 		log.Fatal(err)
+	} else {
+	logrus.Info("Completed")
 	}
 }
 
@@ -76,9 +78,10 @@ func changeIP(requestedIP net.IP) (err error) {
 	case "nsone":
 		changeNSONE()
 	default:
-		return errors.New("resolver not set in config, or set to incorrect value")
+		logrus.Error("resolver not set in config, or set to incorrect value")
+		return errors.New("resolver not set")
 	}
-	return errors.New("we should never get here, fell off the switch in changeIP")
+	return nil
 }
 
 func getConfig() (err error) {
