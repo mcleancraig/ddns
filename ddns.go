@@ -51,11 +51,11 @@ func getConfig() (err error) {
 
 func compareAndRun() (err error) {
 	logrus.Debug("In function compareAndRun")
-	currentIP, err := getCurrentIp()
+	currentIP, err := getCurrentIP()
 	if err != nil {
 		return errors.Errorf("Failed getting IP: %v", err)
 	}
-	currentDNS, err := getCurrentDns()
+	currentDNS, err := getCurrentDNS()
 	if err != nil {
 		return errors.Errorf("DNS Lookup failed: %v", err)
 	}
@@ -73,10 +73,8 @@ func compareAndRun() (err error) {
 	err = changeIP(currentIP)
 	if err != nil {
 		return
-	} else {
-		return nil
 	}
-
+	return nil
 }
 
 func changeIP(requestedIP net.IP) (err error) {
@@ -89,7 +87,10 @@ func changeIP(requestedIP net.IP) (err error) {
 			return
 		}
 	case "nsone":
-		changeNSONE()
+		changeNSONE(requestedIP)
+		if err != nil {
+			return
+		}
 	default:
 		logrus.Error("resolver not set in config, or set to incorrect value")
 		return errors.New("resolver not set")
@@ -97,7 +98,7 @@ func changeIP(requestedIP net.IP) (err error) {
 	return nil
 }
 
-func getCurrentIp() (reportedIP net.IP, err error) {
+func getCurrentIP() (reportedIP net.IP, err error) {
 	logrus.Debug("In function getCurrentIP")
 	var (
 		finder = viper.GetStringSlice("ip_finder")
@@ -115,7 +116,7 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 				logrus.Errorf("from %s: %v", v, err)
 			}
 			reportedIP := net.ParseIP(strings.TrimSpace(string(body)))
-			logrus.Debugf("response from %v was: %v ", v, string(reportedIP))
+			logrus.Debugf("response from %v was: %v ", v, reportedIP)
 			if reportedIP != nil {
 				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIP)
 				return reportedIP, nil
@@ -129,7 +130,7 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 	return net.ParseIP(""), errors.New("get IP failed")
 }
 
-func getCurrentDns() (_ net.IP, err error) {
+func getCurrentDNS() (_ net.IP, err error) {
 
 	var outputIP net.IP
 	targetname := viper.GetString("record")
@@ -203,7 +204,7 @@ func changeAWS(requestedIP net.IP) (err error) {
 	return nil
 }
 
-func changeNSONE() {
+func changeNSONE(requestedIP net.IP) (err error) {
 	httpClient := &http.Client{Timeout: time.Second * 10}
 	client := api.NewClient(httpClient, api.SetAPIKey(viper.GetString("api_key")))
 
@@ -215,5 +216,5 @@ func changeNSONE() {
 	for _, z := range zones {
 		fmt.Println(z.Zone)
 	}
-
+	return nil
 }
