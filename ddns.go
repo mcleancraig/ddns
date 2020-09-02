@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	api "gopkg.in/ns1/ns1-go.v2/rest"
+	"godoc github.com/miekg/dns"
 )
 
 func main() {
