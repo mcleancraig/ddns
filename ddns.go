@@ -1,26 +1,26 @@
-//TODO
-// Do authoritative DNS lookup rather than just address?
-
 package main
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net"
+	"net/http"
+	"strings"
+	"time"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"io/ioutil"
-	"log"
-	"net"
-	"net/http"
-	"strings"
+	api "gopkg.in/ns1/ns1-go.v2/rest"
 )
 
 func main() {
-	var err error
-	err = getConfig()
+	err := getConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,19 +32,32 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	} else {
-	logrus.Info("Completed")
+		logrus.Info("Completed")
 	}
+}
+func getConfig() (err error) {
+	logrus.Debug("In function getConfig")
+	viper.SetConfigName("ddns")
+	viper.AddConfigPath("$HOME/.ddns/")
+	viper.AddConfigPath("/etc/ddns/")
+	err = viper.ReadInConfig()
+	if err != nil {
+		return err // not strictly needed as this is all it will return by default
+	}
+	// config checks
+
+	return nil
 }
 
 func compareAndRun() (err error) {
 	logrus.Debug("In function compareAndRun")
 	currentIP, err := getCurrentIp()
 	if err != nil {
-		return
+		return errors.Errorf("Failed getting IP: %v", err)
 	}
 	currentDNS, err := getCurrentDns()
 	if err != nil {
-		return
+		return errors.Errorf("DNS Lookup failed: %v", err)
 	}
 	if currentIP == nil {
 		return errors.New("Current IP is not valid")
@@ -84,19 +97,6 @@ func changeIP(requestedIP net.IP) (err error) {
 	return nil
 }
 
-func getConfig() (err error) {
-	logrus.Debug("In function getConfig")
-	viper.SetConfigName("ddns")
-	viper.AddConfigPath("$HOME/.ddns/")
-	viper.AddConfigPath("/etc/ddns/")
-	err = viper.ReadInConfig()
-	if err != nil {
-		return
-		// logrus.Errorf("%v", err)
-	}
-	return nil
-}
-
 func getCurrentIp() (reportedIP net.IP, err error) {
 	logrus.Debug("In function getCurrentIP")
 	var (
@@ -114,14 +114,14 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 			if err != nil {
 				logrus.Errorf("from %s: %v", v, err)
 			}
-			reportedIp := net.ParseIP(strings.TrimSpace(string(body)))
+			reportedIP := net.ParseIP(strings.TrimSpace(string(body)))
 			logrus.Debugf("response from %v was: %v ", v, string(reportedIP))
-			if reportedIp != nil {
-				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIp)
-				return reportedIp, nil
+			if reportedIP != nil {
+				logrus.Infof("Current IP address reported by %v as: %v ", v, reportedIP)
+				return reportedIP, nil
 
 			} else {
- 				logrus.Errorf("Missed getting an IP from %s", v)	
+				logrus.Errorf("Missed getting an IP from %s", v)
 			}
 
 		}
@@ -129,21 +129,17 @@ func getCurrentIp() (reportedIP net.IP, err error) {
 	return net.ParseIP(""), errors.New("get IP failed")
 }
 
-func getCurrentDns() ( _ net.IP, err error) {
-	// need to do authoritative lookup here, avoid cache
+func getCurrentDns() (_ net.IP, err error) {
 
-	// lookup NS servers
-	// fall out if no NS records found
-	// loop through servers
-	// lookup target on server
-	// return if found
-	// fall out if not
 	var outputIP net.IP
+	targetname := viper.GetString("record")
 	logrus.Debug("In function getCurrentDns")
-	nameservers, err := net.LookupNS(viper.GetString("record"))
+	logrus.Debug("Finding nameservers for ", targetname)
+	nameservers, err := net.LookupNS(targetname)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Debug("Results: %v", nameservers)
 	for _, ns := range nameservers {
 		nshost := ns.Host
 		logrus.Debugf("Looking up %v against %v", viper.GetString("record"), nshost)
@@ -208,5 +204,16 @@ func changeAWS(requestedIP net.IP) (err error) {
 }
 
 func changeNSONE() {
-	logrus.Debug("This needs to be written!")
+	httpClient := &http.Client{Timeout: time.Second * 10}
+	client := api.NewClient(httpClient, api.SetAPIKey(viper.GetString("api_key")))
+
+	zones, _, err := client.Zones.List()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, z := range zones {
+		fmt.Println(z.Zone)
+	}
+
 }
