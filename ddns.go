@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,11 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	api "gopkg.in/ns1/ns1-go.v2/rest"
-	"godoc github.com/miekg/dns"
 )
 
 func main() {
@@ -133,14 +132,28 @@ func getCurrentIP() (reportedIP net.IP, err error) {
 
 func getCurrentDNS() (_ net.IP, err error) {
 
-	var outputIP net.IP
+	//	var outputIP net.IP
 	targetname := viper.GetString("record")
 	logrus.Debug("In function getCurrentDns")
 	logrus.Debug("Finding nameservers for ", targetname)
-	nameservers, err := net.LookupNS(targetname)
+	//nameservers, err := net.LookupNS(targetname)
+	dnsconfig, _ := dns.ClientConfigFromFile("/etc/resolv.conf")
+	dnsclient := new(dns.Client)
+	msg := new(dns.Msg)
+	msg.SetQuestion(dns.Fqdn(targetname), dns.TypeSOA)
+	msg.RecursionDesired = true
+	record, _, err := dnsclient.Exchange(msg, net.JoinHostPort(dnsconfig.Servers[0], dnsconfig.Port))
 	if err != nil {
 		return nil, err
 	}
+	if record == nil {
+		logrus.Fatal("Nothing returned by DNS lookup")
+	}
+	for _, answer := range record.Ns {
+		//TODO - unfuck this
+		fmt.Printf("%v\n", dns.RR.(answer.String)
+	}
+	/*nameservers := "192.168.1.1"
 	logrus.Debug("Results: %v", nameservers)
 	for _, ns := range nameservers {
 		nshost := ns.Host
@@ -164,6 +177,7 @@ func getCurrentDNS() (_ net.IP, err error) {
 		return outputIP, nil
 
 	}
+	*/
 	return nil, errors.New("Fell out of nameserver loop without getting any results")
 
 }
