@@ -130,7 +130,6 @@ func getCurrentIP() (reportedIP net.IP, err error) {
 
 func getCurrentDNS() (_ net.IP, err error) {
 
-	//targetname := viper.GetString("record")
 	logrus.Debug("In function getCurrentDns")
 	logrus.Debug("Finding nameservers for ", viper.GetString("record"))
 
@@ -139,7 +138,6 @@ func getCurrentDNS() (_ net.IP, err error) {
 	//
 
 	nameserver, _ := net.LookupNS(viper.GetString("record"))
-	//nameserver, _ := net.LookupNS("candi-home.com")
 	if nameserver == nil {
 		return nil, errors.Errorf("No nameservers found for %v", viper.GetString("record"))
 	}
@@ -208,7 +206,7 @@ func changeAWS(requestedIP net.IP) (err error) {
 }
 
 func changeNSONE(requestedIP net.IP) (err error) {
-	logrus.Debug("In function listNSONE")
+	logrus.Debug("In function changeNSONE")
 
 	httpClient := &http.Client{Timeout: time.Second * 10}
 	client := api.NewClient(httpClient, api.SetAPIKey(viper.GetString("api_key")))
@@ -226,8 +224,10 @@ func changeNSONE(requestedIP net.IP) (err error) {
 	record.Answers = []*dns.Answer{
 		dns.NewAv4Answer(requestedIP.String())}
 	_, err = client.Records.Update(record)
+	logrus.Debugf("pushing change")
+
 	if err != nil {
-		return errors.Errorf("NSOne failed to update!:\n", err)
+		return errors.Errorf("NSOne failed to update!:\n %v", err)
 	}
 	return nil
 }
