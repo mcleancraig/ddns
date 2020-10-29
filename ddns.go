@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"io/ioutil"
 	"log"
 	"net"
@@ -12,11 +12,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/route53"
-	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	api "gopkg.in/ns1/ns1-go.v2/rest"
+	"gopkg.in/ns1/ns1-go.v2/rest/model/dns"
 )
 
 func main() {
@@ -24,7 +24,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if viper.GetString("debug") == "true" {
+	var (
+		debug = viper.GetString("debug")
+	)
+
+	if debug == "true" {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
 	logrus.Debug("In main")
@@ -44,8 +48,6 @@ func getConfig() (err error) {
 	if err != nil {
 		return err // not strictly needed as this is all it will return by default
 	}
-	// config checks
-
 	return nil
 }
 
@@ -79,8 +81,7 @@ func compareAndRun() (err error) {
 
 func changeIP(requestedIP net.IP) (err error) {
 	logrus.Debug("In function changeIP")
-	resolver := viper.GetString("resolver")
-	switch resolver {
+	switch viper.GetString("provider") {
 	case "aws":
 		err = changeAWS(requestedIP)
 		if err != nil {
@@ -92,18 +93,15 @@ func changeIP(requestedIP net.IP) (err error) {
 			return
 		}
 	default:
-		logrus.Error("resolver not set in config, or set to incorrect value")
-		return errors.New("resolver not set")
+		logrus.Error("provider not set in config, or set to incorrect value")
+		return errors.New("provider not set")
 	}
 	return nil
 }
 
 func getCurrentIP() (reportedIP net.IP, err error) {
 	logrus.Debug("In function getCurrentIP")
-	var (
-		finder = viper.GetStringSlice("ip_finder")
-	)
-	for _, v := range finder {
+	for _, v := range viper.GetStringSlice("ip_finder") {
 		logrus.Debugf("Getting IP from %s", v)
 		resp, err := http.Get(v)
 		if err != nil {
@@ -132,30 +130,20 @@ func getCurrentIP() (reportedIP net.IP, err error) {
 
 func getCurrentDNS() (_ net.IP, err error) {
 
-	//	var outputIP net.IP
-	targetname := viper.GetString("record")
+	//targetname := viper.GetString("record")
 	logrus.Debug("In function getCurrentDns")
-	logrus.Debug("Finding nameservers for ", targetname)
-	//nameservers, err := net.LookupNS(targetname)
-	dnsconfig, _ := dns.ClientConfigFromFile("/etc/resolv.conf")
-	dnsclient := new(dns.Client)
-	msg := new(dns.Msg)
-	msg.SetQuestion(dns.Fqdn(targetname), dns.TypeSOA)
-	msg.RecursionDesired = true
-	record, _, err := dnsclient.Exchange(msg, net.JoinHostPort(dnsconfig.Servers[0], dnsconfig.Port))
-	if err != nil {
-		return nil, err
+	logrus.Debug("Finding nameservers for ", viper.GetString("record"))
+
+	//
+	// ns method
+	//
+
+	nameserver, _ := net.LookupNS(viper.GetString("record"))
+	//nameserver, _ := net.LookupNS("candi-home.com")
+	if nameserver == nil {
+		return nil, errors.Errorf("No nameservers found for %v", viper.GetString("record"))
 	}
-	if record == nil {
-		logrus.Fatal("Nothing returned by DNS lookup")
-	}
-	for _, answer := range record.Ns {
-		//TODO - unfuck this
-		fmt.Printf("%v\n", dns.RR.(answer.String)
-	}
-	/*nameservers := "192.168.1.1"
-	logrus.Debug("Results: %v", nameservers)
-	for _, ns := range nameservers {
+	for _, ns := range nameserver {
 		nshost := ns.Host
 		logrus.Debugf("Looking up %v against %v", viper.GetString("record"), nshost)
 		resolver := &net.Resolver{
@@ -171,13 +159,13 @@ func getCurrentDNS() (_ net.IP, err error) {
 		}
 		// Now we get an array back, so we need to find out what's in it
 		for _, name := range resp {
-			outputIP = net.ParseIP(name.String())
+			outputIP := net.ParseIP(name.String())
 			logrus.Infof("DNS Lookup returned %s from %v", outputIP, nshost)
+			return outputIP, nil
 		}
-		return outputIP, nil
 
 	}
-	*/
+
 	return nil, errors.New("Fell out of nameserver loop without getting any results")
 
 }
@@ -193,14 +181,14 @@ func changeAWS(requestedIP net.IP) (err error) {
 	params := &route53.ChangeResourceRecordSetsInput{
 		ChangeBatch: &route53.ChangeBatch{ // Required
 			Changes: []*route53.Change{ // Required
-				{ // Required
+				{
 					Action: aws.String("UPSERT"), // Required
 					ResourceRecordSet: &route53.ResourceRecordSet{ // Required
 						Name: aws.String(viper.GetString("record")), // Required
 						Type: aws.String("A"),                       // Required
 						TTL:  aws.Int64(600),
 						ResourceRecords: []*route53.ResourceRecord{
-							{ // Required
+							{
 								Value: aws.String(requestedIP.String()), // Required
 							},
 						},
@@ -209,7 +197,7 @@ func changeAWS(requestedIP net.IP) (err error) {
 			},
 			Comment: aws.String("Changed by ddns script"),
 		},
-		HostedZoneId: aws.String(viper.GetString("aws_zone")), // Required
+		HostedZoneId: aws.String(viper.GetString("awsZone")), // Required
 	}
 
 	_, err = svc.ChangeResourceRecordSets(params)
@@ -220,16 +208,26 @@ func changeAWS(requestedIP net.IP) (err error) {
 }
 
 func changeNSONE(requestedIP net.IP) (err error) {
+	logrus.Debug("In function listNSONE")
+
 	httpClient := &http.Client{Timeout: time.Second * 10}
 	client := api.NewClient(httpClient, api.SetAPIKey(viper.GetString("api_key")))
+	zone := viper.GetString("nsone_zone")
+	domain := viper.GetString("record")
+	logrus.Debug("Looking for " + domain + " in zone " + zone)
 
-	zones, _, err := client.Zones.List()
+	record, _, err := client.Records.Get(zone, domain, "A")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, z := range zones {
-		fmt.Println(z.Zone)
+	logrus.Debugf("found %T: %v", record, record)
+	logrus.Debugf("changing to %v", requestedIP)
+	record.Answers = []*dns.Answer{
+		dns.NewAv4Answer(requestedIP.String())}
+	_, err = client.Records.Update(record)
+	if err != nil {
+		return errors.Errorf("NSOne failed to update!:\n", err)
 	}
 	return nil
 }
