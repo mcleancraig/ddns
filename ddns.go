@@ -74,7 +74,7 @@ func compareAndRun() (err error) {
 	logrus.Info("ip doesn't match dns - update wanted")
 	err = changeIP(currentIP)
 	if err != nil {
-		return
+		return err
 	}
 	return nil
 }
@@ -85,12 +85,14 @@ func changeIP(requestedIP net.IP) (err error) {
 	case "aws":
 		err = changeAWS(requestedIP)
 		if err != nil {
-			return
+			logrus.Error("provider ChangeAWS returned error: %s", err)
+			return err
 		}
 	case "nsone":
-		changeNSONE(requestedIP)
+		err = changeNSONE(requestedIP)
 		if err != nil {
-			return
+			logrus.Error("provider ChangeNSONE returned error: %s", err)
+			return err
 		}
 	default:
 		logrus.Error("provider not set in config, or set to incorrect value")
@@ -108,10 +110,11 @@ func getCurrentIP() (reportedIP net.IP, err error) {
 			logrus.Errorf("from %s: %v", v, err)
 		} else {
 			defer resp.Body.Close()
-			logrus.Debugf("Opening connection to %s", v)
+			logrus.Debugf("Reading response from %s", v)
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				logrus.Errorf("from %s: %v", v, err)
+				return nil, err
 			}
 			reportedIP := net.ParseIP(strings.TrimSpace(string(body)))
 			logrus.Debugf("response from %v was: %v ", v, reportedIP)
@@ -121,6 +124,7 @@ func getCurrentIP() (reportedIP net.IP, err error) {
 
 			} else {
 				logrus.Errorf("Missed getting an IP from %s", v)
+				return nil, err
 			}
 
 		}
@@ -148,10 +152,10 @@ func getCurrentDNS() (_ net.IP, err error) {
 			PreferGo: true,
 			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 				d := net.Dialer{}
-				return d.DialContext(ctx, "udp", net.JoinHostPort(nshost, "53"))
+				return d.DialContext(ctx, "udp4", net.JoinHostPort(nshost, "53"))
 			},
 		}
-		resp, err := resolver.LookupIPAddr(context.Background(), viper.GetString("record"))
+		resp, err := resolver.LookupIP(context.Background(), "ip4", viper.GetString("record"))
 		if err != nil {
 			return nil, errors.Errorf("error from resolver: %v", err)
 		}
