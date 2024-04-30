@@ -91,7 +91,7 @@ func changeIP(requestedIP net.IP) (err error) {
 	case "nsone":
 		err = changeNSONE(requestedIP)
 		if err != nil {
-			logrus.Error("provider ChangeAWS returned error: %s", err)
+			logrus.Error("provider ChangeNSONE returned error: %s", err)
 			return err
 		}
 	default:
